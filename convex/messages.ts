@@ -35,7 +35,7 @@ export const list = query({
     const membership = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation_user", (q) =>
-        q.eq("conversationId", args.conversationId).eq("userId", me._id)
+        q.eq("conversationId", args.conversationId).eq("userId", me._id),
       )
       .unique();
     if (!membership) return [];
@@ -43,7 +43,7 @@ export const list = query({
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_conversation_createdAt", (q) =>
-        q.eq("conversationId", args.conversationId)
+        q.eq("conversationId", args.conversationId),
       )
       .order("asc")
       .collect();
@@ -78,7 +78,7 @@ export const send = mutation({
     const membership = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation_user", (q) =>
-        q.eq("conversationId", args.conversationId).eq("userId", me._id)
+        q.eq("conversationId", args.conversationId).eq("userId", me._id),
       )
       .unique();
     if (!membership) {
@@ -91,5 +91,20 @@ export const send = mutation({
       body: args.body,
       createdAt: Date.now(),
     });
+  },
+});
+
+export const deleteMessage = mutation({
+  args: { messageId: v.id("messages") },
+  handler: async (ctx, args) => {
+    const me = await getCurrentUser(ctx);
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+    if (message.senderId !== me._id) {
+      throw new Error("You can only delete your own messages");
+    }
+    await ctx.db.patch(args.messageId, { deletedAt: Date.now() });
   },
 });

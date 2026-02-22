@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,8 @@ export function MessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showNew, setShowNew] = useState(false);
   const atBottomRef = useRef(true);
+  const deleteMessage = useMutation(api.messages.deleteMessage);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     const el = scrollRef.current;
@@ -35,6 +37,17 @@ export function MessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages?.length]);
 
+  const handleDeleteMessage = async (messageId: Id<"messages">) => {
+    setDeletingId(messageId);
+    try {
+      await deleteMessage({ messageId });
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (!messages) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-ink-500">
@@ -52,7 +65,7 @@ export function MessageList({
   }
 
   return (
-    <div className="relative flex flex-1 flex-col">
+    <div className="relative flex flex-1 flex-col overflow-hidden">
       <div
         ref={scrollRef}
         onScroll={() => {
@@ -71,8 +84,8 @@ export function MessageList({
           <div
             key={message._id}
             className={cn(
-              "flex",
-              message.isMine ? "justify-end" : "justify-start"
+              "flex group",
+              message.isMine ? "justify-end" : "justify-start",
             )}
           >
             <div
@@ -80,20 +93,29 @@ export function MessageList({
                 "max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-glow",
                 message.isMine
                   ? "bg-ink-900 text-white"
-                  : "bg-white text-ink-800"
+                  : "bg-white text-ink-800",
               )}
             >
-              {!message.isMine && (
-                <p className="text-xs font-semibold text-ink-500">
-                  {message.senderName}
-                </p>
-              )}
               <p className={cn(message.deletedAt && "italic text-ink-400")}>
                 {message.deletedAt ? "This message was deleted." : message.body}
               </p>
-              <p className="mt-1 text-right text-[11px] text-ink-400">
-                {formatMessageTime(message.createdAt)}
-              </p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <p className="text-[11px] text-ink-400">
+                  {formatMessageTime(message.createdAt)}
+                </p>
+                {message.isMine && !message.deletedAt && (
+                  <button
+                    onClick={() => handleDeleteMessage(message._id)}
+                    disabled={deletingId === message._id}
+                    className={cn(
+                      "opacity-0 transition group-hover:opacity-100",
+                      "text-[11px] font-semibold px-2 py-0.5 rounded text-ink-400 hover:text-ink-600 hover:bg-ink-100 disabled:opacity-50",
+                    )}
+                  >
+                    {deletingId === message._id ? "Deleting..." : "Delete"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}

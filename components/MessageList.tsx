@@ -6,11 +6,14 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { formatMessageTime } from "@/lib/format";
+import { Reactions } from "./Reactions";
 
 export function MessageList({
   conversationId,
+  isGroup,
 }: {
   conversationId: Id<"conversations">;
+  isGroup?: boolean;
 }) {
   const messages = useQuery(api.messages.list, { conversationId });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,34 +91,46 @@ export function MessageList({
               message.isMine ? "justify-end" : "justify-start",
             )}
           >
-            <div
-              className={cn(
-                "max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-glow",
-                message.isMine
-                  ? "bg-ink-900 text-white"
-                  : "bg-white text-ink-800",
-              )}
-            >
-              <p className={cn(message.deletedAt && "italic text-ink-400")}>
-                {message.deletedAt ? "This message was deleted." : message.body}
-              </p>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="text-[11px] text-ink-400">
-                  {formatMessageTime(message.createdAt)}
-                </p>
-                {message.isMine && !message.deletedAt && (
-                  <button
-                    onClick={() => handleDeleteMessage(message._id)}
-                    disabled={deletingId === message._id}
-                    className={cn(
-                      "opacity-0 transition group-hover:opacity-100",
-                      "text-[11px] font-semibold px-2 py-0.5 rounded text-ink-400 hover:text-ink-600 hover:bg-ink-100 disabled:opacity-50",
-                    )}
-                  >
-                    {deletingId === message._id ? "Deleting..." : "Delete"}
-                  </button>
+            <div className="max-w-[75%]">
+              <div
+                className={cn(
+                  "rounded-2xl px-4 py-2 text-sm shadow-glow",
+                  message.isMine
+                    ? "bg-ink-900 text-white"
+                    : "bg-white text-ink-800",
                 )}
+              >
+                {isGroup && !message.isMine && (
+                  <p className="text-xs font-semibold mb-1 text-ink-500">
+                    {message.senderName}
+                  </p>
+                )}
+                <p className={cn(message.deletedAt && "italic text-ink-400")}>
+                  {message.deletedAt
+                    ? "This message was deleted."
+                    : message.body}
+                </p>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-ink-400">
+                    {formatMessageTime(message.createdAt)}
+                  </p>
+                  {message.isMine && !message.deletedAt && (
+                    <button
+                      onClick={() => handleDeleteMessage(message._id)}
+                      disabled={deletingId === message._id}
+                      className={cn(
+                        "opacity-0 transition group-hover:opacity-100",
+                        "text-[11px] font-semibold px-2 py-0.5 rounded text-ink-400 hover:text-ink-600 hover:bg-ink-100 disabled:opacity-50",
+                      )}
+                    >
+                      {deletingId === message._id ? "Deleting..." : "Delete"}
+                    </button>
+                  )}
+                </div>
               </div>
+              {!message.deletedAt && (
+                <Reactions messageId={message._id} isMine={message.isMine} />
+              )}
             </div>
           </div>
         ))}

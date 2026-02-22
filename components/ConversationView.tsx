@@ -61,7 +61,10 @@ export function ConversationView({
         )}
       </div>
 
-      <MessageList conversationId={conversationId} />
+      <MessageList
+        conversationId={conversationId}
+        isGroup={conversation?.isGroup ?? false}
+      />
 
       <div className="px-4 pb-2">
         <TypingIndicator conversationId={conversationId} />

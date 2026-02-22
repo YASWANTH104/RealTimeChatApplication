@@ -42,7 +42,7 @@ export const getOrCreateDm = mutation({
       const member = await ctx.db
         .query("conversationMembers")
         .withIndex("by_conversation_user", (q) =>
-          q.eq("conversationId", existing._id).eq("userId", me._id)
+          q.eq("conversationId", existing._id).eq("userId", me._id),
         )
         .unique();
 
@@ -95,7 +95,7 @@ export const list = query({
     const onlineIds = new Set(
       presence
         .filter((record) => now - record.lastSeen < 30000)
-        .map((record) => record.userId)
+        .map((record) => record.userId),
     );
 
     const result = [];
@@ -108,14 +108,14 @@ export const list = query({
       let avatarUrl: string | null | undefined;
       let isOnline = false;
 
-      if (!conversation.isGroup) {
-        const members = await ctx.db
-          .query("conversationMembers")
-          .withIndex("by_conversation", (q) =>
-            q.eq("conversationId", conversation._id)
-          )
-          .collect();
+      const members = await ctx.db
+        .query("conversationMembers")
+        .withIndex("by_conversation", (q) =>
+          q.eq("conversationId", conversation._id),
+        )
+        .collect();
 
+      if (!conversation.isGroup) {
         const other = members.find((member) => member.userId !== me._id);
         if (other) {
           const otherUser = await ctx.db.get(other.userId);
@@ -126,12 +126,14 @@ export const list = query({
             isOnline = onlineIds.has(otherUser._id);
           }
         }
+      } else {
+        subtitle = `${members.length} members`;
       }
 
       const lastMessage = await ctx.db
         .query("messages")
         .withIndex("by_conversation_createdAt", (q) =>
-          q.eq("conversationId", conversation._id)
+          q.eq("conversationId", conversation._id),
         )
         .order("desc")
         .first();
@@ -139,14 +141,14 @@ export const list = query({
       const messages = await ctx.db
         .query("messages")
         .withIndex("by_conversation_createdAt", (q) =>
-          q.eq("conversationId", conversation._id)
+          q.eq("conversationId", conversation._id),
         )
         .collect();
 
       const unreadCount = messages.filter(
         (message) =>
           message.createdAt > membership.lastReadAt &&
-          message.senderId !== me._id
+          message.senderId !== me._id,
       ).length;
 
       result.push({
@@ -162,6 +164,8 @@ export const list = query({
         lastMessageAt: lastMessage?.createdAt ?? null,
         unreadCount,
         isOnline,
+        isGroup: conversation.isGroup,
+        memberCount: members.length,
       });
     }
 
@@ -184,7 +188,7 @@ export const get = query({
     const membership = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation_user", (q) =>
-        q.eq("conversationId", args.conversationId).eq("userId", me._id)
+        q.eq("conversationId", args.conversationId).eq("userId", me._id),
       )
       .unique();
     if (!membership) return null;
@@ -198,7 +202,7 @@ export const get = query({
       const members = await ctx.db
         .query("conversationMembers")
         .withIndex("by_conversation", (q) =>
-          q.eq("conversationId", conversation._id)
+          q.eq("conversationId", conversation._id),
         )
         .collect();
       const other = members.find((member) => member.userId !== me._id);
@@ -226,6 +230,7 @@ export const get = query({
       subtitle,
       avatarUrl: avatarUrl ?? null,
       isOnline,
+      isGroup: conversation.isGroup,
     };
   },
 });
@@ -238,10 +243,42 @@ export const markRead = mutation({
     const membership = await ctx.db
       .query("conversationMembers")
       .withIndex("by_conversation_user", (q) =>
-        q.eq("conversationId", args.conversationId).eq("userId", me._id)
+        q.eq("conversationId", args.conversationId).eq("userId", me._id),
       )
       .unique();
     if (!membership) return;
     await ctx.db.patch(membership._id, { lastReadAt: Date.now() });
+  },
+});
+
+export const createGroup = mutation({
+  args: { name: v.string(), memberIds: v.array(v.id("users")) },
+  handler: async (ctx, args) => {
+    const me = await getCurrentUser(ctx);
+
+    if (!args.memberIds.includes(me._id)) {
+      args.memberIds.push(me._id);
+    }
+
+    if (args.memberIds.length < 2) {
+      throw new Error("Group must have at least 2 members");
+    }
+
+    const conversationId = await ctx.db.insert("conversations", {
+      isGroup: true,
+      name: args.name,
+      createdAt: Date.now(),
+    });
+
+    for (const userId of args.memberIds) {
+      await ctx.db.insert("conversationMembers", {
+        conversationId,
+        userId,
+        role: userId === me._id ? "owner" : "member",
+        lastReadAt: 0,
+      });
+    }
+
+    return conversationId;
   },
 });

@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { Sidebar } from "./Sidebar";
 import { ConversationView } from "./ConversationView";
 import { EmptyState } from "./EmptyState";
+import { GroupCreate } from "./GroupCreate";
 
 export function AppShell() {
   useSyncUser();
@@ -19,6 +20,7 @@ export function AppShell() {
     useState<Id<"conversations"> | null>(null);
   const [search, setSearch] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isGroupCreateOpen, setIsGroupCreateOpen] = useState(false);
 
   const isMobile = useIsMobile();
 
@@ -28,6 +30,10 @@ export function AppShell() {
 
   const handleStartConversation = async (userId: Id<"users">) => {
     const conversationId = await getOrCreateDm({ otherUserId: userId });
+    setSelectedConversationId(conversationId);
+  };
+
+  const handleGroupCreated = (conversationId: Id<"conversations">) => {
     setSelectedConversationId(conversationId);
   };
 
@@ -48,6 +54,7 @@ export function AppShell() {
               search={search}
               setSearch={setSearch}
               onSigningOut={() => setIsSigningOut(true)}
+              onCreateGroup={() => setIsGroupCreateOpen(true)}
             />
           </div>
         )}
@@ -79,6 +86,12 @@ export function AppShell() {
           </div>
         </div>
       )}
+
+      <GroupCreate
+        isOpen={isGroupCreateOpen}
+        onClose={() => setIsGroupCreateOpen(false)}
+        onGroupCreated={handleGroupCreated}
+      />
     </div>
   );
 }
